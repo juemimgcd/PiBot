@@ -656,7 +656,7 @@ export async function startBrain(opts: {
     }
     // All queue entry points, including unattended runs, share the SDK boundary. Attaching
     // the GUI only changes admission; it cannot bypass reconciliation or the terminal seal.
-    const contentRuntime = gateAgentContent(sdk, waitForContent, (text) => redactor.redact(text));
+    const contentRuntime = gateAgentContent(sdk, waitForContent, redactor);
     const compactHistory = contentRuntime.compactHistory;
     const agent: AgentRuntime = {
       ...contentRuntime,

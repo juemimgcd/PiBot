@@ -1555,6 +1555,10 @@ export async function generateRun(
             : cancelled
               ? "aborted"
               : mapAgentError(error);
+    const providerError =
+      error instanceof AgentError && error.code === code && code !== "aborted" ? error : undefined;
+    const status = providerError?.httpStatus;
+    const detail = providerError?.providerDetail;
     // The run's own signal may be the reason it ended; delivery gets a short one of its own.
     const delivered = await deliverOutputs(
       replies.content,
@@ -1571,6 +1575,9 @@ export async function generateRun(
           stopReason: code === "aborted" ? "aborted" : "error",
           ...runModel(bot, run.session),
           ...(delivered?.overflow ? { attachmentOverflow: delivered.overflow } : {}),
+          ...(status || detail
+            ? { providerFailure: { ...(status && { status }), ...(detail && { detail }) } }
+            : {}),
         },
         code,
       );
@@ -1591,13 +1598,10 @@ export async function generateRun(
         code,
         message: code,
       });
-    // Only the HTTP status survives AgentError (raw SDK text can carry keys or bodies); with the
-    // model it tells overload (529/503) from a rejected request (400) when a reply comes back empty.
-    const status = error instanceof AgentError ? error.httpStatus : undefined;
     deps.logger.warn(
       // The budget's own reason (which limit) — one run stopped at 220 tools / 128 requests,
       // under both default limits, and the log could not say why.
-      `Chat ${run.runId} ${code}${status ? ` status=${status}` : ""}${budgetReason ? ` budget=${budgetReason}` : ""} model=${bot.modelProvider ?? "?"}/${bot.modelId ?? "?"}`,
+      `Chat ${run.runId} ${code}${status ? ` status=${status}` : ""}${budgetReason ? ` budget=${budgetReason}` : ""} model=${bot.modelProvider ?? "?"}/${bot.modelId ?? "?"}${detail ? ` detail=${JSON.stringify(detail)}` : ""}`,
     );
   } finally {
     deps.local?.background.continuation.releaseProjection(run.runId);

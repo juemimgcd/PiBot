@@ -29,6 +29,8 @@ export interface ProviderCatalogEntry {
 }
 
 export interface OpenSessionOptions {
+  /** Supplied after the host has loaded its registered secrets. */
+  redactProviderDetail?(text: string): string;
   retryBoundary?: {
     messageId: string;
     record(entryId: string, sessionFile: string, messageId?: string): void;

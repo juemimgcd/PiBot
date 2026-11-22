@@ -2,6 +2,7 @@ import {
   interruptedMessage,
   type LiveRunActivity,
   messageBubbleText,
+  providerFailureText,
   replyCitationText,
   routineNoticeText,
   silentWake,
@@ -205,6 +206,7 @@ function MessageBody({
   }
   const failed = message.role === "error" || message.status === "error";
   const streaming = message.status === "streaming";
+  const providerFailure = failed && providerFailureText(message, shared);
   return (
     <BotRow
       look={look}
@@ -225,6 +227,11 @@ function MessageBody({
             <Text style={[type.body, { color: colors.danger }]}>
               {failureText(message.errorCode, t, shared)}
             </Text>
+            {providerFailure && (
+              <Text selectable style={[type.small, { color: colors.danger }]}>
+                {providerFailure}
+              </Text>
+            )}
           </View>
           {onRetry && <Button icon="refresh" title={t("retryFrom")} onPress={onRetry} />}
         </>

@@ -24,6 +24,7 @@ export {
 export { interruptedMessage } from "./chat/interrupted.ts";
 export { readMainBot } from "./chat/main-bot.ts";
 export { nextReply } from "./chat/next-reply.ts";
+export { providerFailureText } from "./chat/provider-failure.ts";
 export { ChatReadCache, chatReadCache, disposeChatReads } from "./chat/read-cache.ts";
 export { replyCitationText } from "./chat/reply-citations.ts";
 export { appendReplyDelta, preserveLiveReply } from "./chat/reply-delta.ts";

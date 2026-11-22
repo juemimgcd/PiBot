@@ -1,6 +1,7 @@
 import {
   interruptedMessage,
   messageBubbleText,
+  providerFailureText,
   silentWake,
   type ToolPaths,
 } from "@pibot/client-core";
@@ -234,6 +235,7 @@ export const ChatMessage = memo(function ChatMessage({
     !Array.isArray(message.usage) &&
     message.usage.imageGeneration === true;
   const failureCode = messageFailureCode(message);
+  const providerFailure = failureCode && providerFailureText(message, t);
   const failed = !!failureCode;
   const interrupted = interruptedMessage(message);
   const waiting = activity?.approvals.some(
@@ -445,6 +447,7 @@ export const ChatMessage = memo(function ChatMessage({
                   : `errors.${failureCode ?? "internal"}`,
               )}
             </p>
+            {providerFailure && <p className={styles.notice}>{providerFailure}</p>}
             {agentFacts?.errorDetail && (
               <p className={styles.notice}>
                 {t("externalAgents.errors.agentSaid", {

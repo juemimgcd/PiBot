@@ -664,6 +664,7 @@
   max-width: 100%;
 }
 .error p {
+  overflow-wrap: anywhere;
   color: var(--danger);
   margin: 0 0 10px;
 }

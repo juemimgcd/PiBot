@@ -7,8 +7,32 @@ import {
 
 export type BrainRedactor = NamedRedactor;
 
-export function createBrainRedactor(): BrainRedactor {
-  return withNamedRedaction(createRedactor());
+export function createBrainRedactor() {
+  const shared = withNamedRedaction(createRedactor());
+  // Chat redaction deliberately ignores short anonymous values (e.g. a one-letter
+  // local model key). Provider diagnostics can quote those credentials verbatim.
+  const shortSecrets = new Map<string, RegExp>();
+  return {
+    ...shared,
+    add(value: string) {
+      shared.add(value);
+      if (value.length < 8 && !shortSecrets.has(value)) {
+        const literal = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        shortSecrets.set(
+          value,
+          new RegExp(`(?<![\\p{L}\\p{N}_])${literal}(?![\\p{L}\\p{N}_])`, "u"),
+        );
+      }
+    },
+    redactProviderDetail(text: string) {
+      // Match a standalone credential. A one-letter local key can otherwise hide
+      // unrelated explanations from every provider that happens to use that letter.
+      for (const token of shortSecrets.values()) {
+        if (token.test(text)) return "";
+      }
+      return shared.redact(text);
+    },
+  };
 }
 
 export function redactValue(value: unknown, redactor: Redactor): unknown {

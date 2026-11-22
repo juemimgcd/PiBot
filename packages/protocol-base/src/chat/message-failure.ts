@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { MessageSchema } from "./entities.ts";
 
 type Message = z.infer<typeof MessageSchema>;
@@ -20,4 +20,16 @@ export function messageFailureCode(
   )
     return "output_limit";
   return undefined;
+}
+
+const providerFailure = z.strictObject({
+  status: z.number().int().min(100).max(599).optional(),
+  detail: z.string().max(300).optional(),
+});
+
+export function messageProviderFailure(message: Pick<Message, "usage">) {
+  const usage = message.usage;
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) return;
+  const parsed = providerFailure.safeParse(usage.providerFailure);
+  return parsed.success ? parsed.data : undefined;
 }

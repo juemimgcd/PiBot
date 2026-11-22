@@ -51,13 +51,17 @@ function keptReply(message: AssistantMessage): AssistantMessage | undefined {
     part.type === "text" && part.text.trim() ? [{ type: "text" as const, text: part.text }] : [],
   );
   if (!content.length) return undefined;
-  const { errorMessage: _error, ...rest } = message;
+  const { errorMessage: _error, diagnostics: _diagnostics, ...rest } = message;
   return { ...rest, content, stopReason: "length" };
 }
 
-function classified(error: unknown): AgentError {
-  const code = mapAgentError(error);
-  return new AgentError(code === "internal" ? "provider_error" : code, agentHttpStatus(error));
+function classified(error: unknown, status?: number, detail?: string): AgentError {
+  const code = mapAgentError(error, status);
+  return new AgentError(
+    code === "internal" ? "provider_error" : code,
+    status ?? agentHttpStatus(error),
+    detail,
+  );
 }
 
 function failed(model: Model<Api>, error: unknown, partial?: AssistantMessage): AssistantMessage {
@@ -70,6 +74,8 @@ function failed(model: Model<Api>, error: unknown, partial?: AssistantMessage): 
       : code === "internal"
         ? "provider_error"
         : code;
+  // SDK diagnostic objects can include request bodies and headers even when errorMessage is safe.
+  const { diagnostics: _diagnostics, ...fields } = partial ?? {};
   return {
     role: "assistant",
     content: [],
@@ -85,7 +91,7 @@ function failed(model: Model<Api>, error: unknown, partial?: AssistantMessage): 
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
     timestamp: Date.now(),
-    ...partial,
+    ...fields,
     stopReason: code === "aborted" ? "aborted" : "error",
     // SDK diagnostics can carry credentials; only fixed codes and the HTTP number survive.
     errorMessage: `${diagnostic}${status ? ` HTTP ${status}` : ""}`,
@@ -102,6 +108,7 @@ export function retryStream(input: {
     hint?: string;
     response(response: ProviderResponse): void;
   }): ResponseStream | Promise<ResponseStream>;
+  describeFailure?(error: unknown): string | undefined;
   onLimit?(limit: { maxTokens: number }): void;
 }) {
   const output = createAssistantMessageEventStream();
@@ -124,6 +131,7 @@ export function retryStream(input: {
       for (;;) {
         signal?.throwIfAborted();
         const receipt = accounting.begin(model, "response", input.toolSet);
+        let responseStatus: number | undefined;
         let observed = false;
         let result: AssistantMessage;
         let error: unknown;
@@ -131,7 +139,10 @@ export function retryStream(input: {
         try {
           const stream = await input.open({
             hint: recovery.hint,
-            response: (response) => recovery.response(response),
+            response: (response) => {
+              responseStatus = response.status;
+              recovery.response(response);
+            },
           });
           for await (const event of stream) {
             // A provider may attach its last usage only to the terminal event, even when result rejects.
@@ -163,17 +174,14 @@ export function retryStream(input: {
           result = failed(model, signal?.aborted ? { name: "AbortError" } : caught, partial);
         }
         observed ||= hasOutput(result);
+        // On a 200 stream, a number from the error body is not the HTTP response status.
+        const attemptError = error === undefined ? undefined : classified(error, responseStatus);
         const unbilled = receipt.settle(
           result,
-          error === undefined
-            ? undefined
-            : {
-                error,
-                outputObserved: observed,
-              },
+          attemptError && { error: attemptError, outputObserved: observed },
         );
         const rateLimited =
-          mapAgentError(error) === "rate_limited" && agentHttpStatus(error) === 429;
+          attemptError?.code === "rate_limited" && attemptError.httpStatus === 429;
         const recoveryRetry =
           result.stopReason === "error" && !signal?.aborted && !accounting.blocked
             ? recovery.next(result, rateLimited && unbilled, accounting.retryAttempts)
@@ -190,7 +198,7 @@ export function retryStream(input: {
           !signal?.aborted &&
           !accounting.blocked &&
           !rateLimited &&
-          !!transientRequestError(error ?? result.errorMessage) &&
+          !!transientRequestError(attemptError ?? result.errorMessage) &&
           midStreamRetries < MID_STREAM_RETRIES &&
           accounting.retryAttempts < CONNECTION_RETRY_DELAYS.length;
         const limit =
@@ -215,7 +223,7 @@ export function retryStream(input: {
             attempt: accounting.retryAttempts,
             maxAttempts: CONNECTION_RETRY_DELAYS.length,
           };
-          const status = agentHttpStatus(error);
+          const status = attemptError?.httpStatus;
           accounting.onReconnect?.({
             type: "reconnect",
             phase: "start",
@@ -254,14 +262,14 @@ export function retryStream(input: {
           if (retry.kind === "connection") accounting.retryAttempts++;
           // Why it failed, as a code and HTTP status only (never provider text): without it the
           // log shows a run losing a minute to backoff with no cause.
-          const status = agentHttpStatus(error);
+          const status = attemptError?.httpStatus;
           accounting.onReconnect?.({
             type: "reconnect",
             phase: "start",
             attempt: retry.attempt,
             maxAttempts: retry.maxAttempts,
             delayMs: retry.delayMs,
-            reason: retry.kind === "connection" ? mapAgentError(error) : retry.kind,
+            reason: retry.kind === "connection" ? attemptError?.code : retry.kind,
             ...(status === undefined ? {} : { status }),
           });
           await wait(retry.delayMs, undefined, { signal });
@@ -286,10 +294,21 @@ export function retryStream(input: {
         if (result.stopReason !== "error" && result.stopReason !== "aborted")
           accounting.retryAttempts = 0;
         if (result.stopReason === "error" || result.stopReason === "aborted") {
-          accounting.responseError = classified(
-            signal?.aborted ? { name: "AbortError" } : (error ?? result.errorMessage),
-          );
+          const cause = error ?? result.errorMessage;
+          accounting.responseError =
+            signal?.aborted || result.stopReason === "aborted"
+              ? new AgentError("aborted")
+              : classified(cause, responseStatus, input.describeFailure?.(cause));
           const final = failed(model, accounting.responseError, result);
+          // Keep upstream text out of errorMessage: pi also reads it to decide whether to compact.
+          if (accounting.responseError.providerDetail)
+            final.diagnostics = [
+              {
+                type: "provider_error",
+                timestamp: final.timestamp,
+                error: { message: accounting.responseError.providerDetail },
+              },
+            ];
           output.push({
             type: "error",
             reason: final.stopReason === "aborted" ? "aborted" : "error",

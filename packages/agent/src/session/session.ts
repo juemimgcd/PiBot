@@ -444,14 +444,13 @@ export function wrapSession(
           usage: usageInfo(assistant.usage),
         };
       } catch (error) {
-        throw new AgentError(
-          eventFailed
-            ? "session_event_handler_failed"
-            : aborted
-              ? "aborted"
-              : (programFailure?.() ?? mapAgentError(error)),
-          agentHttpStatus(error),
-        );
+        const code = eventFailed
+          ? "session_event_handler_failed"
+          : aborted
+            ? "aborted"
+            : (programFailure?.() ?? mapAgentError(error));
+        if (error instanceof AgentError && error.code === code) throw error;
+        throw new AgentError(code, agentHttpStatus(error));
       } finally {
         emitActivity({ phase: "clear" });
         if (additions) {

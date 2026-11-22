@@ -15,6 +15,7 @@ import { storedSessionFile } from "../../session/session-files.ts";
 import { CacheDiagnostics } from "../cache-diagnostic.ts";
 import { contextBudget, responseMaxTokens } from "../context-budget.ts";
 import { historyTokens, referenceTokens, textTokens } from "../context-estimate.ts";
+import { providerDetail } from "../provider-diagnostic.ts";
 import { RequestAccounting } from "../request-observer.ts";
 import { retryStream } from "../retry-stream.ts";
 import type { RuntimeContext } from "../runtime.ts";
@@ -339,6 +340,9 @@ export function createSessionOperations({
             model,
             signal: requestSignal,
             accounting,
+            describeFailure: (error) =>
+              opts.redactProviderDetail &&
+              providerDetail(error, scopedRequest.messages, opts.redactProviderDetail),
             toolSet: extensions.loadout?.snapshot(scopedRequest),
             open: async (recovery) => {
               const onPayload = options?.onPayload;

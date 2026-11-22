@@ -1,9 +1,11 @@
+import { readProviderError } from "./provider-response-error.ts";
 import type { AgentErrorCode } from "./types.ts";
 
 export class AgentError extends Error {
   constructor(
     readonly code: AgentErrorCode,
     readonly httpStatus?: number,
+    readonly providerDetail?: string,
   ) {
     // Never expose raw SDK diagnostics: they can contain keys, headers or response bodies.
     super(code);
@@ -28,11 +30,16 @@ export function transientRequestError(
 }
 
 export function agentHttpStatus(err: unknown): number | undefined {
+  if (err instanceof AgentError) return err.httpStatus;
   const seen = new Set<unknown>();
   function extract(value: unknown): number | undefined {
     if (typeof value === "string") {
-      // pi flattens HTTP errors into messages; retain only the numeric status for diagnostics.
-      const match = /\b([45]\d\d)\b/.exec(value);
+      const parsed = readProviderError(value);
+      if (parsed.status !== undefined) return parsed.status;
+      // Fixed Pi Bot errors also carry trailing "HTTP 503"; numbers in arbitrary prose are not statuses.
+      const match = /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*([45]\d\d)\b/i.exec(
+        parsed.message ?? "",
+      );
       return match ? Number(match[1]) : undefined;
     }
     if (!value || typeof value !== "object" || seen.has(value)) return undefined;
@@ -76,7 +83,7 @@ export function providerModelLimit(
   return maxTokens >= 256 && maxTokens < current ? { maxTokens } : undefined;
 }
 
-export function mapAgentError(err: unknown): AgentErrorCode {
+export function mapAgentError(err: unknown, responseStatus?: number): AgentErrorCode {
   if (err instanceof AgentError) return err.code;
   const seen = new Set<unknown>();
   function classify(value: unknown): AgentErrorCode {
@@ -91,7 +98,7 @@ export function mapAgentError(err: unknown): AgentErrorCode {
       message?: string;
       cause?: unknown;
     };
-    const status = agentHttpStatus(item);
+    const status = responseStatus ?? agentHttpStatus(item);
     const message = typeof item.message === "string" ? item.message : "";
     if (message === "subscription_unsupported") return "subscription_unsupported";
     if (message.includes("claude_subscription_unsupported"))
@@ -124,7 +131,7 @@ export function mapAgentError(err: unknown): AgentErrorCode {
     if (
       status === 401 ||
       status === 403 ||
-      /\b(?:401|403|unauthorized|forbidden)\b|invalid.{0,10}(?:api.?key|authentication)|no api key|authentication failed/i.test(
+      /\b(?:unauthorized|forbidden)\b|invalid.{0,10}(?:api.?key|authentication)|no api key|authentication failed/i.test(
         message,
       )
     )
@@ -138,8 +145,7 @@ export function mapAgentError(err: unknown): AgentErrorCode {
       return "quota_exhausted";
     const caused = item.cause ? classify(item.cause) : "internal";
     if (caused === "quota_exhausted") return caused;
-    if (status === 429 || /\b429\b|rate.?limit|too many requests/i.test(message))
-      return "rate_limited";
+    if (status === 429 || /rate.?limit|too many requests/i.test(message)) return "rate_limited";
     if (
       /^(?:E(?:CONNREFUSED|CONNRESET|NETUNREACH|HOSTUNREACH|NOTFOUND|AI_AGAIN|TIMEDOUT)|UND_ERR_(?:CONNECT_TIMEOUT|SOCKET))$/.test(
         item.code ?? "",
@@ -157,23 +163,19 @@ export function mapAgentError(err: unknown): AgentErrorCode {
     if (
       status === 529 ||
       status === 503 ||
-      /\b(?:529|503)\b|overloaded|over capacity|temporarily unavailable|service unavailable/i.test(
-        message,
-      )
+      /overloaded|over capacity|temporarily unavailable|service unavailable/i.test(message)
     )
       return "provider_overloaded";
     if (
       status === 400 ||
       status === 404 ||
       status === 422 ||
-      /\b(?:400|404|422)\b|invalid.request|model.*not found|unsupported (?:parameter|model)/i.test(
-        message,
-      )
+      /invalid.request|model.*not found|unsupported (?:parameter|model)/i.test(message)
     )
       return "provider_rejected";
     if (
       (status !== undefined && status >= 400) ||
-      /\b(?:[45]\d\d)\b|provider error|context.*(?:length|window|exceed)/i.test(message)
+      /provider error|context.*(?:length|window|exceed)/i.test(message)
     )
       return "provider_error";
     return caused;

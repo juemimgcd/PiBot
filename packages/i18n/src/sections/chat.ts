@@ -2,6 +2,8 @@
 // T11（外壳、侧栏、私聊）往这里加。
 
 export const chatZh = {
+  "chat.providerFailure": "模型服务返回：{response}",
+  "chat.providerStreamFailure": "模型响应流报错：{response}",
   "chat.citationsUnread": "引用提示：{count} 个链接未在本轮成功读取，请核对后再使用。",
   "chat.citationsIncomplete": "引用提示：本轮来源记录或回复超出核对范围，未能完整核对。",
   "chat.citationsScope": "此检查仅核对链接是否读过，不证明页面含有所引数字或结论正确。",
@@ -213,6 +215,8 @@ export const chatZh = {
 } as const;
 
 export const chatEn: { [K in keyof typeof chatZh]: string } = {
+  "chat.providerFailure": "Provider response: {response}",
+  "chat.providerStreamFailure": "Model stream failed: {response}",
   "chat.citationsUnread":
     "Citation note: {count} links were not successfully read in this run. Verify them before use.",
   "chat.citationsIncomplete":

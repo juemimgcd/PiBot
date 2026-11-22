@@ -166,6 +166,7 @@ patchedDependencies:
   '@anthropic-ai/sandbox-runtime@0.0.81': b30ed35336aede795bedd4e651cc54d3c93b818bd38dd5051c778daae26a9f12
   '@earendil-works/pi-ai@1.4.0': 3691afa4875910ec216409e7896bf3859b8041e517e37339facd2b00194b417f
   '@earendil-works/pi-coding-agent@1.4.0': 2e7563dfdc2703ef056fe67014c68e7417d2c6065c6ef0e2bc785bd111cffe58
+  '@google/genai@2.21.0': 6d817f39ca09a0815eded16f5cb38c25074a80642029e60b17dbd730693d383b
   react-native-webrtc@155.0.1: 27113f8e7a6de1306d9235b43dd257cb22e07d63bbe0b85c9bbe25fef00d34cc
 
 importers:
@@ -237,7 +238,7 @@ importers:
         version: 1.4.0(patch_hash=2e7563dfdc2703ef056fe67014c68e7417d2c6065c6ef0e2bc785bd111cffe58)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(supports-color@7.2.0)(ws@8.22.0)(zod@4.6.5)
       '@google/genai':
         specifier: 2.21.0
-        version: 2.21.0(supports-color@7.2.0)
+        version: 2.21.0(patch_hash=6d817f39ca09a0815eded16f5cb38c25074a80642029e60b17dbd730693d383b)(supports-color@7.2.0)
       '@modelcontextprotocol/client':
         specifier: 2.3.1
         version: 2.3.1
@@ -805,7 +806,7 @@ importers:
         version: 1.4.0(patch_hash=2e7563dfdc2703ef056fe67014c68e7417d2c6065c6ef0e2bc785bd111cffe58)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(supports-color@7.2.0)(ws@8.22.0)(zod@4.6.5)
       '@google/genai':
         specifier: 2.21.0
-        version: 2.21.0(supports-color@7.2.0)
+        version: 2.21.0(patch_hash=6d817f39ca09a0815eded16f5cb38c25074a80642029e60b17dbd730693d383b)(supports-color@7.2.0)
       '@modelcontextprotocol/client':
         specifier: 2.3.1
         version: 2.3.1
@@ -9909,7 +9910,7 @@ snapshots:
       '@anthropic-ai/sdk': 0.129.0(zod@4.6.5)
       '@aws-sdk/client-bedrock-runtime': 3.1127.0
       '@earendil-works/pi-telemetry': 1.4.0
-      '@google/genai': 2.21.0(supports-color@7.2.0)
+      '@google/genai': 2.21.0(patch_hash=6d817f39ca09a0815eded16f5cb38c25074a80642029e60b17dbd730693d383b)(supports-color@7.2.0)
       '@smithy/node-http-handler': 4.12.1
       http-proxy-agent: 9.1.0(supports-color@7.2.0)
       https-proxy-agent: 9.1.0(supports-color@7.2.0)
@@ -10720,7 +10721,7 @@ snapshots:
       lodash.isundefined: 3.0.1
       lodash.uniq: 4.5.0
 
-  '@google/genai@2.21.0(supports-color@7.2.0)':
+  '@google/genai@2.21.0(patch_hash=6d817f39ca09a0815eded16f5cb38c25074a80642029e60b17dbd730693d383b)(supports-color@7.2.0)':
     dependencies:
       google-auth-library: 10.9.1(supports-color@7.2.0)
       p-retry: 4.6.2

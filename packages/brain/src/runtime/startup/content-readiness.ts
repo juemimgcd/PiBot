@@ -4,7 +4,10 @@ import type { AgentRuntime } from "@pibot/agent";
 export function gateAgentContent(
   runtime: AgentRuntime,
   ready: (signal?: AbortSignal) => Promise<void>,
-  redact: (text: string) => string,
+  {
+    redact,
+    redactProviderDetail,
+  }: { redact(text: string): string; redactProviderDetail(text: string): string },
 ): AgentRuntime {
   const gate =
     <Input extends { signal?: AbortSignal }, Output>(
@@ -20,6 +23,7 @@ export function gateAgentContent(
     ...runtime,
     openSession: gate(runtime.openSession, (input) => ({
       ...input,
+      redactProviderDetail,
       systemPrompt:
         typeof input.systemPrompt === "string" ? redact(input.systemPrompt) : input.systemPrompt,
     })),
