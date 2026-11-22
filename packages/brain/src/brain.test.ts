@@ -333,6 +333,33 @@ describe("T8 brain", () => {
       expect(await readFile(join(dir, "logs", log), "utf8")).not.toContain(testKey);
   });
 
+  it("keeps the upstream reason in the failed chat message and out of log exports", async () => {
+    await configure();
+    const { runId } = await peer.call("chat.send", { botId, text: "Hi" });
+    await waitPrompt();
+    const detail = "Unexpected message role.";
+    reject?.(new AgentError("provider_error", 200, detail));
+    await vi.waitFor(async () =>
+      expect((await history())[1]).toMatchObject({
+        status: "error",
+        errorCode: "provider_error",
+        usage: { providerFailure: { status: 200, detail } },
+      }),
+    );
+    const logsDir = join(dir, "logs");
+    const logs = await Promise.all(
+      (await readdir(logsDir)).map((name) => readFile(join(logsDir, name), "utf8")),
+    );
+    const logText = logs.join("\n");
+    expect(logText).toContain(`Chat ${runId} provider_error status=200`);
+    expect(logText).not.toContain(detail);
+    const snapshot = await peer.call("diagnostics.snapshot", undefined);
+    expect(snapshot.runs).toContainEqual(
+      expect.objectContaining({ runId, errorCode: "provider_error" }),
+    );
+    expect(JSON.stringify(snapshot)).not.toContain(detail);
+  });
+
   it("rejects concurrent sends even during async availability preflight", async () => {
     await configure();
     const original = runtime.listModels;

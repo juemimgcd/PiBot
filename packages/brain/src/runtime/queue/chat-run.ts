@@ -1601,7 +1601,7 @@ export async function generateRun(
     deps.logger.warn(
       // The budget's own reason (which limit) — one run stopped at 220 tools / 128 requests,
       // under both default limits, and the log could not say why.
-      `Chat ${run.runId} ${code}${status ? ` status=${status}` : ""}${budgetReason ? ` budget=${budgetReason}` : ""} model=${bot.modelProvider ?? "?"}/${bot.modelId ?? "?"}${detail ? ` detail=${JSON.stringify(detail)}` : ""}`,
+      `Chat ${run.runId} ${code}${status ? ` status=${status}` : ""}${budgetReason ? ` budget=${budgetReason}` : ""} model=${bot.modelProvider ?? "?"}/${bot.modelId ?? "?"}`,
     );
   } finally {
     deps.local?.background.continuation.releaseProjection(run.runId);

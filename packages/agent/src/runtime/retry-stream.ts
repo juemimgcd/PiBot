@@ -300,15 +300,6 @@ export function retryStream(input: {
               ? new AgentError("aborted")
               : classified(cause, responseStatus, input.describeFailure?.(cause));
           const final = failed(model, accounting.responseError, result);
-          // Keep upstream text out of errorMessage: pi also reads it to decide whether to compact.
-          if (accounting.responseError.providerDetail)
-            final.diagnostics = [
-              {
-                type: "provider_error",
-                timestamp: final.timestamp,
-                error: { message: accounting.responseError.providerDetail },
-              },
-            ];
           output.push({
             type: "error",
             reason: final.stopReason === "aborted" ? "aborted" : "error",

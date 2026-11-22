@@ -23,11 +23,10 @@ export function readProviderError(text: string): { status?: number; message?: st
   const code = provider?.[1] ?? httpCode;
   const status = code === undefined ? undefined : Number(code);
   const body = http && code === httpCode ? rest.slice(http[0].length) : rest;
-  const line = body.split("\n", 1)[0] ?? "";
-  if (!body.startsWith("{")) return { status, message: line.length <= 16_384 ? line : undefined };
+  if (!body.startsWith("{")) return { status, message: body };
 
   // OpenRouter can append raw metadata on a new line after a complete JSON body.
-  const firstLine = line.trimEnd();
+  const firstLine = body.split("\n", 1)[0]?.trimEnd() ?? "";
   const json = firstLine.endsWith("}") ? firstLine : body;
   if (json.length > 16_384) return { status };
   try {

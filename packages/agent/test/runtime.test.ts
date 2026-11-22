@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 import type { AgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { createRedactor } from "@pibot/secrets";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AgentRuntime,
@@ -513,6 +514,41 @@ describe("custom model discovery using fetch stubs", () => {
       expect(new Headers(init?.headers).get("X-Literal")).toBe("$OPENAI_API_KEY");
     },
   );
+  it.each([
+    [
+      400,
+      "Input tag 'developer' found using 'role' does not match any of the expected tags: 'system', 'user', 'assistant', 'tool'",
+    ],
+    [
+      200,
+      String.raw`Tool 20 function has invalid 'parameters' schema: '^[^\p{Cc}\p{Cf}]+$' is not a 'regex'. Failed validating 'format' in metaschema. On schema['properties']['items']['items']['properties']['id']['pattern']: '^[^\p{Cc}\p{Cf}]+$'`,
+    ],
+    [200, "Unexpected message role."],
+    [422, "Invalid value for the network field."],
+  ] as const)("preserves the upstream chat explanation for HTTP %i: %s", async (status, detail) => {
+    custom = [local];
+    const error = JSON.stringify({ error: { message: `${detail}\nAdditional gateway context` } });
+    const streaming = status === 200;
+    const fetch = stubFetch(
+      new Response(streaming ? `data: ${error}\n\n` : error, {
+        status,
+        headers: { "content-type": streaming ? "text/event-stream" : "application/json" },
+      }),
+    );
+    const session = await open({
+      ...options(),
+      systemPrompt: "Check each message role: system, user, assistant, tool.",
+      redactProviderDetail: createRedactor().redact,
+    });
+    await expect(session.prompt("hello", () => {})).rejects.toMatchObject({
+      code: streaming ? "provider_error" : "provider_rejected",
+      httpStatus: status,
+      providerDetail: detail,
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    const transcript = fs.readFileSync(join(dataDir, session.sessionFile), "utf8");
+    expect(transcript).not.toContain(JSON.stringify(detail).slice(1, -1));
+  });
   it("uses API-specific authentication and response formats", async () => {
     const spy = stubFetch(
       new Response(JSON.stringify({ models: [{ name: "models/gemini-test" }] })),

@@ -38,7 +38,7 @@ export function agentHttpStatus(err: unknown): number | undefined {
       if (parsed.status !== undefined) return parsed.status;
       // Fixed Pi Bot errors also carry trailing "HTTP 503"; numbers in arbitrary prose are not statuses.
       const match = /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?: code)?)\s*[:=]?\s*([45]\d\d)\b/i.exec(
-        parsed.message ?? "",
+        parsed.message?.split("\n", 1)[0] ?? "",
       );
       return match ? Number(match[1]) : undefined;
     }
@@ -146,6 +146,10 @@ export function mapAgentError(err: unknown, responseStatus?: number): AgentError
     const caused = item.cause ? classify(item.cause) : "internal";
     if (caused === "quota_exhausted") return caused;
     if (status === 429 || /rate.?limit|too many requests/i.test(message)) return "rate_limited";
+    if (/context.*(?:length|window|exceed|overflow)|maximum.*tokens/i.test(message))
+      return "context_overflow";
+    // A rejected field can be named "network" or contain "service unavailable".
+    if (status === 400 || status === 404 || status === 422) return "provider_rejected";
     if (
       /^(?:E(?:CONNREFUSED|CONNRESET|NETUNREACH|HOSTUNREACH|NOTFOUND|AI_AGAIN|TIMEDOUT)|UND_ERR_(?:CONNECT_TIMEOUT|SOCKET))$/.test(
         item.code ?? "",
@@ -156,8 +160,6 @@ export function mapAgentError(err: unknown, responseStatus?: number): AgentError
       )
     )
       return "network";
-    if (/context.*(?:length|window|exceed|overflow)|maximum.*tokens/i.test(message))
-      return "context_overflow";
     // Split what the user can act on: wait / switch model (overloaded) vs. fix the request
     // (rejected); everything else from the provider stays provider_error.
     if (
@@ -166,12 +168,7 @@ export function mapAgentError(err: unknown, responseStatus?: number): AgentError
       /overloaded|over capacity|temporarily unavailable|service unavailable/i.test(message)
     )
       return "provider_overloaded";
-    if (
-      status === 400 ||
-      status === 404 ||
-      status === 422 ||
-      /invalid.request|model.*not found|unsupported (?:parameter|model)/i.test(message)
-    )
+    if (/invalid.request|model.*not found|unsupported (?:parameter|model)/i.test(message))
       return "provider_rejected";
     if (
       (status !== undefined && status >= 400) ||

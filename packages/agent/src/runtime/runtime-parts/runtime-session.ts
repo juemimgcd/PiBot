@@ -341,8 +341,7 @@ export function createSessionOperations({
             signal: requestSignal,
             accounting,
             describeFailure: (error) =>
-              opts.redactProviderDetail &&
-              providerDetail(error, scopedRequest.messages, opts.redactProviderDetail),
+              opts.redactProviderDetail && providerDetail(error, opts.redactProviderDetail),
             toolSet: extensions.loadout?.snapshot(scopedRequest),
             open: async (recovery) => {
               const onPayload = options?.onPayload;

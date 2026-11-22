@@ -20,17 +20,16 @@ export function createBrainRedactor() {
         const literal = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         shortSecrets.set(
           value,
-          new RegExp(`(?<![\\p{L}\\p{N}_])${literal}(?![\\p{L}\\p{N}_])`, "u"),
+          new RegExp(`(?<![\\p{L}\\p{N}_])${literal}(?![\\p{L}\\p{N}_])`, "gu"),
         );
       }
     },
     redactProviderDetail(text: string) {
       // Match a standalone credential. A one-letter local key can otherwise hide
       // unrelated explanations from every provider that happens to use that letter.
-      for (const token of shortSecrets.values()) {
-        if (token.test(text)) return "";
-      }
-      return shared.redact(text);
+      let result = shared.redact(text);
+      for (const token of shortSecrets.values()) result = result.replace(token, "[REDACTED]");
+      return result;
     },
   };
 }
